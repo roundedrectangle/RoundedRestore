@@ -1,8 +1,10 @@
+from __future__ import annotations
 from typing import Optional, Sequence
 from dataclasses import dataclass, field
 from urllib.parse import urljoin
 
 def asset_url(url, asset):
+    if asset == None: return None
     return urljoin(url, asset) or None
 
 @dataclass
@@ -29,19 +31,39 @@ class Tweak:
             )
 
 @dataclass
+class Featured:
+    name: Optional[str] = None
+    bundleid: Optional[str] = None
+    fontcolor: Optional[str] = None
+    showname: bool = True
+    banner: Optional[str] = None
+
+    @classmethod
+    def from_json(cls, data: dict, url: str, repo):
+        return cls(*(data.get(key) for key in ('name', 'bundleid', 'fontcolor', 'showname')), asset_url(url, data.get('banner')))
+    
+    def to_tweak(self, tweak_list: Sequence[Tweak]) -> Optional[Tweak]:
+        for t in tweak_list:
+            if self.bundleid == t.bundleid:
+                return t
+
+@dataclass
 class BaseRepo:
     name: Optional[str] = None
     description: Optional[str] = None
     icon: Optional[str] = None
     packages: Sequence[Tweak] = field(default_factory=list)
-    # TODO: featured
+    featured: Sequence[Featured] = field(default_factory=list)
+    url: Optional[str] = None
 
     @classmethod
     def from_json(cls, data: dict, url: str):
         return cls(
             *(data.get(key) for key in ('name','description')),
             asset_url(url, data.get('icon')),
-            [Tweak.from_json(json, url) for json in data.get('packages', ())]
+            [Tweak.from_json(json, url) for json in data.get('packages', ())],
+            [Featured.from_json(json, url) for json in data.get('featured', ())],
+            url
             )
     
     def load(self):

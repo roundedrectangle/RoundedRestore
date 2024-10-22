@@ -8,6 +8,7 @@ import platform
 REPOS = [
     "https://raw.githubusercontent.com/Lrdsnow/PureKFDRepo/main/v6/repo.json",
     "https://raw.githubusercontent.com/Lrdsnow/SnowRepo/refs/heads/main/v6/repo.json",
+    "http://0.0.0.0:8000/404.json"
 ]
 
 class Repo(BaseRepo):
@@ -115,7 +116,7 @@ async def main(page: ft.Page):
                                         ft.Text(tweak.version, theme_style=ft.TextThemeStyle.TITLE_SMALL, visible=bool(tweak.version)),
                                     ]),
                                     ft.Text(tweak.description, theme_style=ft.TextThemeStyle.TITLE_LARGE, visible=bool(tweak.description)),
-                                    ft.Text(tweak.long_description, theme_style=ft.TextThemeStyle.BODY_LARGE, visible=bool(tweak.long_description)),
+                                    ft.Markdown(tweak.long_description, selectable=True, extension_set=ft.MarkdownExtensionSet.GITHUB_WEB, visible=bool(tweak.long_description)),
                                     ft.Row((ft.FilledButton(text="GET"),), alignment=ft.MainAxisAlignment.END),
                                 ), expand=True), image=ft.DecorationImage(tweak.banner, fit=ft.ImageFit.COVER, opacity=0.5),
                                 expand=True,padding=15),)
@@ -142,13 +143,16 @@ async def main(page: ft.Page):
     page.go(page.route)
     
     async def get_repo(repo):
-        async with aiohttp.ClientSession() as session:
-            async with session.get(repo) as resp:
-                return Repo.from_json(json.loads(await resp.text()), repo)
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(repo) as resp:
+                    return Repo.from_json(json.loads(await resp.text()), repo)
+        except: return Repo()
     
     for repo in REPOS:
         r: Repo = await get_repo(repo)
         repos.append(r)
+        print(ft.CircleAvatar(foreground_image_src=r.icon) if r.icon else ft.Icon(ft.icons.QUESTION_MARK))
         drawer.controls.append(ft.NavigationDrawerDestination(label=r.name or "Unknown",
             icon_content=ft.CircleAvatar(foreground_image_src=r.icon) if r.icon else ft.Icon(ft.icons.QUESTION_MARK)))
         drawer.update()

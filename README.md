@@ -13,6 +13,8 @@ TODO:
 - [ ] Picasso repo support
 - [ ] Featured
 - [ ] Install packages
+- [ ] Add/remove repos
+- [ ] Package settings
 
 Credits:
 
