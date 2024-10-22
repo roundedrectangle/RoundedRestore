@@ -1,6 +1,5 @@
-from math import e
 from typing import Optional, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from urllib.parse import urljoin
 
 def asset_url(url, asset):
@@ -8,33 +7,33 @@ def asset_url(url, asset):
 
 @dataclass
 class Tweak:
-    name: Optional[str]
-    bundleid: Optional[str]
-    author: Optional[str]
-    description: Optional[str]
-    long_description: Optional[str]
-    version: Optional[str]
-    icon: Optional[str]
-    banner: Optional[str]
-    path: Optional[str]
-    screenshots: Sequence[str]
-    varOnly: bool
+    name: Optional[str] = None
+    bundleid: Optional[str] = None
+    author: Optional[str] = None
+    description: Optional[str] = None
+    long_description: Optional[str] = None
+    version: Optional[str] = None
+    icon: Optional[str] = None
+    banner: Optional[str] = None
+    path: Optional[str] = None
+    screenshots: Sequence[str] = field(default_factory=list)
+    varOnly: bool = True
 
     @classmethod
     def from_json(cls, data: dict, url: str):
         return cls(
             *(data.get(key) for key in ('name', 'bundleid', 'author', 'description', 'long_description', 'version')),
             *(asset_url(url, data.get(asset)) for asset in ('icon', 'banner', 'path')),
-            data.get('screenshots', []),
+            [asset_url(url, s) for s in data.get('screenshots', [])],
             data.get('varOnly', False)
             )
 
 @dataclass
 class BaseRepo:
-    name: Optional[str]
-    description: Optional[str]
-    icon: Optional[str]
-    packages: Sequence[Tweak]
+    name: Optional[str] = None
+    description: Optional[str] = None
+    icon: Optional[str] = None
+    packages: Sequence[Tweak] = field(default_factory=list)
     # TODO: featured
 
     @classmethod

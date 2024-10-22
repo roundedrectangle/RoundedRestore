@@ -104,6 +104,7 @@ async def main(page: ft.Page):
                     )
                 if page.route.startswith('/tweak'): # /tweak:repoid:tweakid
                     tweak = repos[repo_id].packages[tweak_id]
+                    screenshot_list = ft.ListView(expand=True, horizontal=True, spacing=15)
                     page.views.append(
                         ft.View(controls=[
                             ft.Row((
@@ -115,12 +116,16 @@ async def main(page: ft.Page):
                                     ]),
                                     ft.Text(tweak.description, theme_style=ft.TextThemeStyle.TITLE_LARGE, visible=bool(tweak.description)),
                                     ft.Text(tweak.long_description, theme_style=ft.TextThemeStyle.BODY_LARGE, visible=bool(tweak.long_description)),
-                                    ft.Row((ft.FilledButton(text="GET"),), alignment=ft.MainAxisAlignment.END)
+                                    ft.Row((ft.FilledButton(text="GET"),), alignment=ft.MainAxisAlignment.END),
                                 ), expand=True), image=ft.DecorationImage(tweak.banner, fit=ft.ImageFit.COVER, opacity=0.5),
                                 expand=True,padding=15),)
-                            )
+                            ), screenshot_list
                         ], **view_kwargs(tweak.name)) # leading...
                     )
+                    for s in tweak.screenshots:
+                        screenshot_list.controls.append(
+                            ft.Image(s, border_radius=ft.border_radius.all(10))
+                        )
 
             case _: page.go('/')
                 
