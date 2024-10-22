@@ -8,7 +8,7 @@ import platform
 REPOS = [
     "https://raw.githubusercontent.com/Lrdsnow/PureKFDRepo/main/v6/repo.json",
     "https://raw.githubusercontent.com/Lrdsnow/SnowRepo/refs/heads/main/v6/repo.json",
-    "http://0.0.0.0:8000/404.json"
+    "http://0.0.0.0:8000/main.json"
 ]
 
 class Repo(BaseRepo):
@@ -147,12 +147,12 @@ async def main(page: ft.Page):
             async with aiohttp.ClientSession() as session:
                 async with session.get(repo) as resp:
                     return Repo.from_json(json.loads(await resp.text()), repo)
-        except: return Repo()
+        except Exception as e:
+            return Repo(description=f"Invalid repo {repo}: {type(e).__name__}: {e}")
     
     for repo in REPOS:
         r: Repo = await get_repo(repo)
         repos.append(r)
-        print(ft.CircleAvatar(foreground_image_src=r.icon) if r.icon else ft.Icon(ft.icons.QUESTION_MARK))
         drawer.controls.append(ft.NavigationDrawerDestination(label=r.name or "Unknown",
             icon_content=ft.CircleAvatar(foreground_image_src=r.icon) if r.icon else ft.Icon(ft.icons.QUESTION_MARK)))
         drawer.update()

@@ -39,7 +39,7 @@ class Featured:
     banner: Optional[str] = None
 
     @classmethod
-    def from_json(cls, data: dict, url: str, repo):
+    def from_json(cls, data: dict, url: str):
         return cls(*(data.get(key) for key in ('name', 'bundleid', 'fontcolor', 'showname')), asset_url(url, data.get('banner')))
     
     def to_tweak(self, tweak_list: Sequence[Tweak]) -> Optional[Tweak]:
