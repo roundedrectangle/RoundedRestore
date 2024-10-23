@@ -10,11 +10,10 @@ For UI, I'm using Flet (aka Flutter for Python). For internal functionality I us
 
 TODO:
 
-- [ ] Picasso repo support
-- [ ] Featured
-- [ ] Install packages
-- [ ] Add/remove repos
-- [ ] Package settings
+- Picasso repo support
+- Install packages
+- Add/remove repos
+- Package settings
 
 Credits:
 

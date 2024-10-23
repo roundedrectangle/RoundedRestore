@@ -20,51 +20,71 @@ class Tweak:
     path: Optional[str] = None
     screenshots: Sequence[str] = field(default_factory=list)
     varOnly: bool = True
+    repo: Optional[Repo] = None
 
     @classmethod
-    def from_json(cls, data: dict, url: str):
+    def from_json(cls, data: dict, url: str, repo: Optional[Repo] = None):
         return cls(
             *(data.get(key) for key in ('name', 'bundleid', 'author', 'description', 'long_description', 'version')),
             *(asset_url(url, data.get(asset)) for asset in ('icon', 'banner', 'path')),
             [asset_url(url, s) for s in data.get('screenshots', [])],
-            data.get('varOnly', False)
+            data.get('varOnly', False), repo
             )
+    
+    def __str__(self) -> str:
+        return self.bundleid or super.__str__(self)
 
 @dataclass
-class Featured:
+class FeaturedEntry:
     name: Optional[str] = None
     bundleid: Optional[str] = None
     fontcolor: Optional[str] = None
     showname: bool = True
+    square: bool = False
     banner: Optional[str] = None
+    tweak_pair: Optional[Tweak] = None
 
     @classmethod
-    def from_json(cls, data: dict, url: str):
-        return cls(*(data.get(key) for key in ('name', 'bundleid', 'fontcolor', 'showname')), asset_url(url, data.get('banner')))
-    
-    def to_tweak(self, tweak_list: Sequence[Tweak]) -> Optional[Tweak]:
-        for t in tweak_list:
-            if self.bundleid == t.bundleid:
-                return t
+    def from_json(cls, data: dict, url: str, obj: Optional[Repo | Tweak] = None):
+        t = obj if isinstance(obj, Tweak) else None
+        if isinstance(obj, Repo) and data.get('bundleid'):
+            t = obj.featured_pair(data.get('bundleid'))
+        return cls(*(data.get(key) for key in ('name', 'bundleid', 'fontcolor', 'showname', 'square')), asset_url(url, data.get('banner')), t)
+
+    def __str__(self) -> str:
+        return self.bundleid or super.__str__(self)
 
 @dataclass
-class BaseRepo:
+class Repo:
     name: Optional[str] = None
     description: Optional[str] = None
     icon: Optional[str] = None
-    packages: Sequence[Tweak] = field(default_factory=list)
-    featured: Sequence[Featured] = field(default_factory=list)
     url: Optional[str] = None
+    packages: dict[str, Tweak] = field(default_factory=dict)
+    featured: Sequence[FeaturedEntry] = field(default_factory=list)
 
     @classmethod
-    def from_json(cls, data: dict, url: str):
-        return cls(
+    def from_json(cls, data: dict, url: str, convert_featured=True):
+        c = cls(
             *(data.get(key) for key in ('name','description')),
-            asset_url(url, data.get('icon')),
-            [Tweak.from_json(json, url) for json in data.get('packages', ())],
-            [Featured.from_json(json, url) for json in data.get('featured', ())],
-            url
+            asset_url(url, data.get('icon')), url
             )
-    
-    def load(self):
-        raise NotImplementedError("loading a repo not implemented in dataclass")
+        for json in data.get('packages', ()):
+            tweak = Tweak.from_json(json, url, c)
+            if not tweak.bundleid:
+                tweak.bundleid = "org.example.unknown"
+            if tweak.bundleid in c.packages:
+                i = 0
+                while f'{tweak.bundleid}{i}' in c.packages:
+                    i+=1
+                tweak.bundleid = f'{tweak.bundleid}{i}'
+            c.packages[tweak.bundleid] = tweak
+
+        c.featured = [FeaturedEntry.from_json(json, url, c) for json in data.get('featured', ())]
+        return c
+
+    def featured_pair(self, obj: FeaturedEntry | str) -> Optional[Tweak]:
+        bundleid = obj
+        if isinstance(obj, FeaturedEntry):
+            bundleid = obj.bundleid
+        return self.packages.get(bundleid)

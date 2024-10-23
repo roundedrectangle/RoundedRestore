@@ -1,7 +1,7 @@
 import flet as ft
 import asyncio, aiohttp
 from typing import Sequence, Optional
-from models import BaseRepo
+from models import Repo, FeaturedEntry, Tweak
 import json
 import platform
 
@@ -10,10 +10,6 @@ REPOS = [
     "https://raw.githubusercontent.com/Lrdsnow/SnowRepo/refs/heads/main/v6/repo.json",
     "http://0.0.0.0:8000/main.json"
 ]
-
-class Repo(BaseRepo):
-    def load(self):
-        print("TODO: load")
 
 async def main(page: ft.Page):
     page.title = "RoundedRestore"
@@ -27,6 +23,7 @@ async def main(page: ft.Page):
             case _: page.go(f"/repo:{e.control.selected_index - 3}")
 
     repos: Sequence[Repo] = []
+    featured = ft.GridView()
 
     drawer = ft.NavigationDrawer(
         # on_dismiss=handle_dismissal,
@@ -46,6 +43,39 @@ async def main(page: ft.Page):
 
     def tweak_loader(repo, tweak):
         return lambda _: page.go(f'/tweak:{repo}:{tweak}')
+    
+    def gen_tweak(entry: FeaturedEntry | Tweak, repo_id: int):
+        name = ft.Text(entry.name or 'Unknown')
+        banner = entry.banner
+        load = None
+        disabled = True
+        if isinstance(entry, FeaturedEntry):
+            name.visible = bool(entry.name)
+            name.color = entry.fontcolor if entry.fontcolor else name.color
+            icon = desc = None
+            if getattr(entry.tweak_pair, 'repo', None) and repo_id != None:
+                load = tweak_loader(repo_id, entry.tweak_pair)
+                disabled = False
+        else:
+            desc = ft.Text(entry.description, visible=bool(entry.description))
+            icon = entry.icon or ft.Icon(ft.icons.QUESTION_MARK)
+            if entry.repo and repo_id != None:
+                load = tweak_loader(repo_id, entry)
+                disabled = False
+        return ft.Card(
+            ft.Container(
+                ft.Column([
+                    ft.ListTile(
+                        leading=ft.CircleAvatar(foreground_image_src=icon) if isinstance(icon, str) and icon else icon,
+                        title=name, subtitle=desc
+                    ),
+                    ft.Row((ft.FilledButton(text="View", on_click=load, disabled=disabled),), alignment=ft.MainAxisAlignment.END)
+                ]),
+                image=ft.DecorationImage(banner, fit=ft.ImageFit.COVER, opacity=0.5) if banner else None,
+                padding=10,
+            ),
+            clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
+        )
 
     def route_change(route):
         page.views.clear()
@@ -54,11 +84,11 @@ async def main(page: ft.Page):
         view_kwargs = lambda title=page.title, **kwargs: {'route': page.route, 'drawer':drawer, 'appbar': construct_appbar(title, **kwargs)}
         match page.route:
             case '/':
-                page.views.append(
-                    ft.View(controls=[
-                        ft.Text("ETA: never", theme_style=ft.TextThemeStyle.DISPLAY_LARGE)
-                    ], **view_kwargs())
-                )
+                featured.expand = True
+                featured.max_extent = 400
+                featured.child_aspect_ratio = 2
+                page.views.append(ft.View(controls=[featured], **view_kwargs()))
+                page.update()
             case '/installed':
                 page.views.append(
                     ft.View(controls=[
@@ -73,36 +103,25 @@ async def main(page: ft.Page):
                 )
             case page.route if page.route.startswith('/repo') or page.route.startswith('/tweak'):
                 if page.route.startswith('/tweak'):
-                    repo_id, tweak_id = (int(''.join((*filter(str.isdigit, i),))) for i in page.route.split(':')[-2:])
+                    repo_id, tweak_id = page.route.split(':')[1], page.route.split(':')[-1]
+                    try: repo_id = int(repo_id)
+                    except:
+                        print(f"Invalid repo ID: {repo_id}. Tweak: {tweak_id}")
+                        page.route('/')
+                        return
                 else:
                     repo_id, tweak_id = int(''.join((*filter(str.isdigit, page.route),))), -1
                 repo = repos[repo_id]
-                repos_list = ft.GridView(expand=True, max_extent=400, child_aspect_ratio=2)
+                tweaks_list = ft.GridView(expand=True, max_extent=400, child_aspect_ratio=2)
                 page.views.append(
                     ft.View(controls=[
-                        ft.Text(r.description, theme_style=ft.TextThemeStyle.TITLE_LARGE, visible=bool(r.description)),
-                        repos_list,
+                        ft.Text(repo.description, theme_style=ft.TextThemeStyle.TITLE_LARGE, visible=bool(repo.description)),
+                        tweaks_list,
                     ], **view_kwargs(repo.name))
                 )
                 page.update()
-                for i, t in enumerate(repo.packages):
-                    repos_list.controls.append(
-                        ft.Card(
-                            ft.Container(
-                                ft.Column([
-                                    ft.ListTile(
-                                        leading=ft.CircleAvatar(foreground_image_src=t.icon) if t.icon else ft.Icon(ft.icons.QUESTION_MARK),
-                                        title=ft.Text(t.name or 'Unknown'),
-                                        subtitle=ft.Text(t.description, visible=bool(t.description)),
-                                    ),
-                                    ft.Row([ft.FilledButton(text="View", on_click=tweak_loader(repo_id, i))], alignment=ft.MainAxisAlignment.END)
-                                ]),
-                                image=ft.DecorationImage(t.banner, fit=ft.ImageFit.COVER, opacity=0.5) if t.banner else None,
-                                padding=10,
-                            ),
-                            clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
-                        )
-                    )
+                for t in repo.packages.values():
+                    tweaks_list.controls.append(gen_tweak(t, repo_id))
                 if page.route.startswith('/tweak'): # /tweak:repoid:tweakid
                     tweak = repos[repo_id].packages[tweak_id]
                     screenshot_list = ft.ListView(expand=True, horizontal=True, spacing=15)
@@ -130,7 +149,6 @@ async def main(page: ft.Page):
 
             case _: page.go('/')
                 
-        # ListView on repo...
         page.update()
 
     def view_pop(view):
@@ -148,13 +166,22 @@ async def main(page: ft.Page):
                 async with session.get(repo) as resp:
                     return Repo.from_json(json.loads(await resp.text()), repo)
         except Exception as e:
+            err = f"Invalid repo {repo}: {type(e).__name__}: {e}"
+            print(err)
+            page.overlay.append(ft.SnackBar(ft.Text(err), open=True))
+            page.update()
             return Repo(description=f"Invalid repo {repo}: {type(e).__name__}: {e}")
     
     for repo in REPOS:
         r: Repo = await get_repo(repo)
+        repo_id = len(repos)
         repos.append(r)
         drawer.controls.append(ft.NavigationDrawerDestination(label=r.name or "Unknown",
             icon_content=ft.CircleAvatar(foreground_image_src=r.icon) if r.icon else ft.Icon(ft.icons.QUESTION_MARK)))
         drawer.update()
+
+        for entry in r.featured:
+            featured.controls.append(gen_tweak(entry, repo_id))
+            page.update()
 
 ft.app(main)
