@@ -8,6 +8,13 @@ Desktop PureKFD is also known as PureRestore
 
 For UI, I'm using Flet (aka Flutter for Python). For internal functionality I use Python. Later I'll use some Swift code from PureKFD-Linux rewritten in Python and some Python code from PureKFD-Linux unmodified.
 
+Current features:
+
+- Repos list
+- Repo page with tweaks
+- Featured
+- Tweak page
+
 TODO:
 
 - Picasso repo support
